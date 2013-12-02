@@ -6,6 +6,7 @@ import java.util.HashSet;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.app.ProgressDialog;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.database.DataSetObserver;
@@ -101,7 +102,7 @@ public class MainActivity extends BaseListActivity implements ITaskFinishedHandl
         mActionbarTitle.setTypeface(FontHelper.getComfortaa(this, true));
         
         mActionbarRefreshProgress.setVisibility(View.GONE);
-        mEmptyListPlaceholder = getLoadingPanel(mRootView);
+        mEmptyListPlaceholder = getEmptyTextView(mRootView);
         mPostsList.setEmptyView(mEmptyListPlaceholder);
         mPostsList.setAdapter(mPostsListAdapter);
 
@@ -191,10 +192,17 @@ public class MainActivity extends BaseListActivity implements ITaskFinishedHandl
         if (taskCode == TASKCODE_LOAD_FEED) {
             if (code.equals(TaskResultCode.Success) && mPostsListAdapter != null)
                 showFeed(result);
+            else if (!code.equals(TaskResultCode.Success))
+                Toast.makeText(this, getString(R.string.
+                        error_unable_to_retrieve_feed), Toast.LENGTH_SHORT).show();
 
-			mActionbarRefreshProgress.setVisibility(View.GONE);
-			mActionbarRefresh.setVisibility(View.VISIBLE);
+            mActionbarRefreshProgress.setVisibility(View.GONE);
+            mActionbarRefresh.setVisibility(View.VISIBLE);
         } else if (taskCode == TASKCODE_LOAD_MORE_POSTS) {
+            if (!code.equals(TaskResultCode.Success))
+                Toast.makeText(this, getString(R.string.
+                        error_unable_to_load_more), Toast.LENGTH_SHORT).show();
+
             mFeed.appendLoadMoreFeed(result);
             mPostsListAdapter.notifyDataSetChanged();
         }
@@ -214,14 +222,24 @@ public class MainActivity extends BaseListActivity implements ITaskFinishedHandl
     }
     
     class GetLastHNFeedTask extends FileUtil.GetLastHNFeedTask {
-        protected void onPostExecute(HNFeed result) {
-            if (result == null) {
-                // TODO: display "Loading..." instead
-            } else if (result.getUserAcquiredFor().equals(Settings
-                    .getUserName(App.getInstance())))
-                showFeed(result);
-        }
-    }
+		ProgressDialog progress;
+
+		@Override
+		protected void onPreExecute() {
+			progress = new ProgressDialog(MainActivity.this);
+			progress.setMessage("Loading");
+			progress.show();
+		}
+
+		protected void onPostExecute(HNFeed result) {
+			if (progress != null && progress.isShowing())
+				progress.dismiss();
+			if (result != null
+					&& result.getUserAcquiredFor().equals(
+							Settings.getUserName(App.getInstance())))
+				showFeed(result);
+		}
+	}
 
     private void startFeedLoading() {
         HNFeedTaskMainFeed.startOrReattach(this, this, TASKCODE_LOAD_FEED);
